@@ -1,4 +1,3 @@
-
 import os
 import json
 import base64
@@ -7,7 +6,6 @@ import websockets
 from openai import OpenAI
 from fastapi import FastAPI, WebSocket, Request
 from fastapi.responses import HTMLResponse
-from fastapi.websockets import WebSocketDisconnect
 from twilio.twiml.voice_response import VoiceResponse, Connect
 import uvicorn
 from dotenv import load_dotenv
@@ -50,7 +48,6 @@ async def handle_incoming_call(request: Request):
     host = request.url.hostname
     connect = Connect()
     connect.stream(url=f"wss://{host}/media-stream")
-
     response.append(connect)
     return HTMLResponse(content=str(response), media_type="text/xml")
 
@@ -66,7 +63,7 @@ async def send_session_update(ws):
         "type": "start",
         "config": {
             "transcription_config": {
-                "encoding": "mulaw",
+                "encoding": "audio/x-mulaw",
                 "sample_rate_hz": 8000,
                 "language_code": "fr-FR"
             },
@@ -74,7 +71,7 @@ async def send_session_update(ws):
         }
     }
     await ws.send(json.dumps(start_message))
-    
+
     session_message = {
         "type": "session.update",
         "input_audio_config": {
@@ -96,13 +93,11 @@ async def handle_media_stream(websocket: WebSocket):
 
     async with websockets.connect(
         'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17',
-        additional_headers=[
-            ("Authorization", f"Bearer {OPENAI_API_KEY}"),
-            ("OpenAI-Beta", "realtime=v1")
-        ]
+        additional_headers={
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "OpenAI-Beta": "realtime=v1"
+        }
     ) as openai_ws:
-
-     
 
         await send_session_update(openai_ws)
         stream_sid = None
@@ -150,7 +145,7 @@ async def handle_media_stream(websocket: WebSocket):
                 async for message in websocket.iter_text():
                     try:
                         data = json.loads(message)
-                        
+
                         if data['event'] == 'media':
                             audio_append = {
                                 "type": "input_audio_buffer.append",
@@ -162,12 +157,12 @@ async def handle_media_stream(websocket: WebSocket):
                             response = await openai_ws.recv()
                             print("<< Received:", response)
                             audio_log.write(f"Received audio: {data['media']['payload']}\n")
-                        
+
                         if data['event'] == 'start':
                             nonlocal stream_sid
                             stream_sid = data['start']['streamSid']
                             print(f"Incoming stream has started\n{stream_sid}")
-                            
+
                     except Exception as e:
                         print(f"Error processing message: {e}")
                         continue
