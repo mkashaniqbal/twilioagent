@@ -47,9 +47,7 @@ async def index_page():
 async def handle_incoming_call(request: Request):
     """Handle incoming call and return TwiML response to connect to Media Stream."""
     response = VoiceResponse()
-    repl_slug = os.getenv('REPL_SLUG')
-    repl_owner = os.getenv('REPL_OWNER')
-    host = f"{repl_slug}.{repl_owner}.repl.co" if repl_slug and repl_owner else request.url.hostname
+    host = request.url.hostname
     connect = Connect()
     connect.stream(url=f"wss://{host}/media-stream")
 )
